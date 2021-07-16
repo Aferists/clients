@@ -6,6 +6,7 @@ import socket
 import zlib
 import threading
 
+
 def main():
     print('1) Upload a file to the server')
     print('2) Display all firmware')
@@ -51,13 +52,13 @@ def sockets():
     fileSumCheck = hex(zlib.crc32(lists))
     size = len(lists)
 
-    sock.sendto(("Upload").encode("utf-8"), server)
+    sock.sendto(("upload").encode("utf-8"), server)
     sock.sendto((scope).encode("utf-8"), server)
     sock.sendto((platform).encode("utf-8"), server)
     sock.sendto((version).encode("utf-8"), server)
     sock.sendto((desc).encode("utf-8"), server)
     sock.sendto((fileSumCheck).encode("utf-8"), server)
-    sock.sendto((size).encode("utf-8"), server)
+    sock.sendto(str(size).encode("utf-8"), server)
     while lists:
         sock.send(lists)
         lists = fopen.read()
@@ -77,7 +78,9 @@ def list():
         items_platform = items_full[i]['platform']
         items_version = items_full[i]['version']
         items_scope = items_full[i]['scope']
-        print(i + 1, f'Platform: {items_platform}, scope: {items_scope}, version: {items_version}, ')
+        items_description = items_full[i]['firmwareDescription']
+        print(i + 1, f'Platform: {items_platform}, scope: {items_scope}, version: {items_version},'
+                     f' description: {items_description} ')
     print('\n')
 
     print('1) Download file')
@@ -91,10 +94,25 @@ def list():
         items_platform = items_full[i]['platform']
         items_version = items_full[i]['version']
         items_scope = items_full[i]['scope']
+        items_description = items_full[i]['firmwareDescription']
         print('\nYou have selected the firmware: ')
-        print(f'Platform: {items_platform}, scope: {items_scope}, version: {items_version}')
+        print(f'Platform: {items_platform}, scope: {items_scope}, version: {items_version},'
+              f' description: {items_description}')
 
         uuid = items_full[i]['uuid']
+
+        host = '127.0.0.1'
+        port = 0
+        server = ("127.0.0.1", 9090)
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((host, port))
+        sock.setblocking(0)
+        rT = threading.Thread(args=("RecvThread", sock))
+        rT.start()
+
+        sock.sendto(('load').encode("utf-8"), server)
+        sock.sendto((uuid).encode("utf-8"), server)
         download_url = f'http://localhost:8000/load?UUID={uuid}'
 
         request_download = urllib.request.Request(download_url)
@@ -118,12 +136,12 @@ def list():
 def filtr():
     platform = input('Platform (Android, iOS Any): ')
     scope = input('Scope: ')
-    print('1) Поиск между версиями')
-    print('2) Найти версию')
+    print('1) Search between versions ')
+    print('2) Find version')
     choos = input('Choose')
     if int(choos) == 1:
-        lversion = input('Введите минимальную версию: ')
-        rversion = input('Введите максимальную версию: ')
+        lversion = input('Enter the minimum version: ')
+        rversion = input('Enter the maximum version: ')
         url = f'http://localhost:8000/get?platform={platform}&lversion={lversion}&rversion={rversion}&scope={scope}'
     elif int(choos) == 2:
         version = input('Version: ')
@@ -141,7 +159,9 @@ def filtr():
         items_platform = items_full[i]['platform']
         items_version = items_full[i]['version']
         items_scope = items_full[i]['scope']
-        print(i + 1, f'Platform: {items_platform}, scope: {items_scope}, version: {items_version}')
+        items_description = items_full[i]['firmwareDescription']
+        print(i + 1, f'Platform: {items_platform}, scope: {items_scope}, version: {items_version},'
+                     f' description: {items_description} ')
     print('\n')
 
     print('1) Download file')
@@ -155,8 +175,10 @@ def filtr():
         items_platform = items_full[i]['platform']
         items_version = items_full[i]['version']
         items_scope = items_full[i]['scope']
+        items_description = items_full[i]['firmwareDescription']
         print('\nYou have selected the firmware: ')
-        print(f'Platform: {items_platform}, scope: {items_scope}, version: {items_version}')
+        print(f'Platform: {items_platform}, scope: {items_scope}, version: {items_version},'
+                     f' description: {items_description} ')
 
         uuid = items_full[i]['uuid']
         download_url = f'http://localhost:8000/load?UUID={uuid}'
@@ -180,7 +202,26 @@ def filtr():
 
 
 def find():
-    pass
+    platform = input('Platform (Android, iOS Any): ')
+    scope = input('Scope: ')
+    version = input('Version: ')
+    url = f'http://localhost:8000/get?platform={platform}&version={version}&scope={scope}'
+
+    request = urllib.request.Request(url)
+    base64string = base64.b64encode(bytes('%s:%s' % ('user', 'user'), 'ascii'))
+    request.add_header("Authorization", "Basic %s" % base64string.decode('utf-8'))
+    result = urllib.request.urlopen(request)
+    resulttext = result.read()
+    json_obj_1 = json.loads(resulttext.decode())
+    items_full = json_obj_1['content']
+
+    items_platform = items_full[0]['platform']
+    items_version = items_full[0]['version']
+    items_scope = items_full[0]['scope']
+    items_description = items_full[0]['firmwareDescription']
+    print(f'Platform: {items_platform}, scope: {items_scope}, version: {items_version},'
+          f' description: {items_description} ')
+    print('\n')
 
 
 def download_file(url):
